@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import collections
 import hashlib
 import html
 import json
@@ -111,8 +112,50 @@ class Crawler:
         url, _frag = urllib.parse.urldefrag(url)
         return url
 
+    def _seed_urls(self):
+        """Discover extra entry points from robots.txt and sitemap.xml.
+
+        A plain link-crawler misses most of a JavaScript-rendered app, whose
+        navigation never appears as <a href> in the served HTML. robots.txt and
+        sitemap.xml are the two places such an app still advertises real paths in
+        plain text, so seeding from them widens coverage without executing JS.
+        """
+        seeds = []
+        try:
+            r = self.session.get(f"{self.base_url}/robots.txt",
+                                 timeout=self.timeout, verify=False)
+            if r.status_code == 200 and len(r.content) < 100000:
+                for line in r.text.splitlines():
+                    line = line.strip()
+                    low = line.lower()
+                    if low.startswith(("allow:", "disallow:")):
+                        path = line.split(":", 1)[1].strip()
+                        if path and path != "/" and "*" not in path:
+                            seeds.append(path)
+                    elif low.startswith("sitemap:"):
+                        seeds.append(line.split(":", 1)[1].strip())
+        except requests.RequestException:
+            pass
+        try:
+            r = self.session.get(f"{self.base_url}/sitemap.xml",
+                                 timeout=self.timeout, verify=False)
+            if r.status_code == 200 and "<loc" in r.text:
+                seeds += re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", r.text)
+        except requests.RequestException:
+            pass
+
+        discovered = []
+        for u in seeds:
+            nu = self._normalize(u)
+            if self._same_domain(nu) and nu not in discovered:
+                discovered.append(nu)
+        if discovered:
+            print(f"  [crawl] seeded {len(discovered)} extra path(s) "
+                  "from robots.txt / sitemap.xml")
+        return discovered
+
     def crawl(self):
-        queue = [self.base_url]
+        queue = [self.base_url] + self._seed_urls()
         while queue and len(self.visited) < self.max_pages:
             url = queue.pop(0)
             if url in self.visited:
@@ -647,6 +690,10 @@ def main():
     json_path = write_json_report(results, args.out)
     html_path = write_html_report(results, args.out)
 
+    counts = collections.Counter(f["severity"] for f in results["findings"])
+    order = ["critical", "high", "medium", "low"]
+    summary = "  ".join(f"{sev}={counts[sev]}" for sev in order if counts.get(sev))
+    print("\n[+] Findings by severity: " + (summary if summary else "none"))
     print(f"[+] Scan took {elapsed:.1f}s")
     print(f"[+] JSON report: {json_path}")
     print(f"[+] HTML report: {html_path}")

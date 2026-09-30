@@ -1,16 +1,55 @@
 # Lightweight Web Vulnerability Scanner
 
-An educational CLI tool that crawls a target web app and checks for:
+![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-9%20passing-2ea44f)
+![Dependencies](https://img.shields.io/badge/dependencies-2-informational)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-1. Missing/misconfigured security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
-2. Insecure cookie flags (Secure / HttpOnly / SameSite)
-3. Exposed sensitive files (`.git/`, `.env`, backups, `robots.txt` leaks)
-4. Reflected XSS (canary string injection)
-5. SQL injection (error-based detection)
-6. Outdated JS libraries (regex version matching against known-vulnerable ranges)
+An educational command-line scanner that crawls a target web application and
+reports common web-security issues. Built as a course project to understand how
+automated scanners work under the hood, using only `requests` and
+`BeautifulSoup`.
 
-> **Only run this against targets you own or are explicitly authorized to test**,
-> such as OWASP Juice Shop or DVWA. Do not point this at real/third-party sites.
+> **Authorized targets only.** Run this against systems you own or have explicit
+> permission to test, such as [OWASP Juice Shop](https://owasp.org/www-project-juice-shop/)
+> or [DVWA](https://github.com/digininja/DVWA). Do not point it at third-party
+> sites you do not control.
+
+## What it checks
+
+| Check | Severity | What it looks for |
+|-------|----------|-------------------|
+| Security headers | medium | Missing CSP, HSTS, X-Frame-Options, X-Content-Type-Options |
+| Cookie flags | medium | Cookies set without `Secure` / `HttpOnly` / `SameSite` |
+| Sensitive files | high | Exposed `.git/`, `.env`, backups; `robots.txt` path disclosure |
+| Reflected XSS | high | Canary payload reflected into a response without encoding |
+| SQL injection | critical | Error-based detection via database error signatures |
+| Outdated JS libraries | medium | Known-vulnerable versions of jQuery, AngularJS, Bootstrap, Lodash |
+
+## How it works
+
+```
+  target URL
+      │
+      ▼
+  ┌─────────┐   seeds extra paths from robots.txt + sitemap.xml,
+  │ Crawler │   then follows same-domain <a href> links and forms
+  └────┬────┘
+       │  pages + forms
+       ▼
+  ┌─────────┐   six independent checks run over the crawled pages,
+  │ Checks  │   discovered forms, and the target root
+  └────┬────┘
+       │  findings
+       ▼
+  ┌─────────┐   JSON (machine-readable) + HTML (severity-sorted,
+  │ Reports │   HTML-escaped) written to <prefix>.json / .html
+  └─────────┘
+```
+
+Each finding is a small dict with a `check`, `severity`, `url`, `title` and
+`detail`, so the JSON output is easy to diff between scans or feed into other
+tooling.
 
 ## Setup
 
@@ -21,34 +60,33 @@ source venv/bin/activate
 pip3 install -r requirements.txt
 ```
 
-`venv` creates an isolated Python environment just for this project, so the
-packages we install don't clash with anything else on your system. You need
-to run `source venv/bin/activate` every time you open a new terminal tab to
-work on this project (you'll see `(venv)` appear in your prompt when it's active).
+## Usage
 
-## Running against Juice Shop
+Against OWASP Juice Shop:
 
 ```bash
 docker run -d -p 3000:3000 --name juiceshop bkimminich/juice-shop
 python3 scanner.py --url http://localhost:3000 --max-pages 30 --out juiceshop_report
 ```
 
-## Running against DVWA
+Against DVWA (auto-handles the login and first-run database setup):
 
 ```bash
 docker run -d -p 4280:80 --name dvwa vulnerables/web-dvwa
-python3 scanner.py --url http://localhost:4280 --max-pages 30 --out dvwa_report
+python3 scanner.py --url http://localhost:4280 --max-pages 30 --out dvwa_report --dvwa-login
 ```
 
-DVWA requires logging in first (admin/password) and setting security level to
-"Low" via the DVWA Security page in the UI before scanning, since most checks
-need to reach pages that sit behind login.
+Key options: `--max-pages` (crawl cap), `--timeout`, `--cookie` (raw cookie
+string for authenticated crawling), `--dvwa-login` (log into DVWA as
+admin/password before crawling).
 
 ## Output
 
-Two files are generated: `<prefix>.json` (machine-readable, good for feeding
-into further analysis/comparison scripts) and `<prefix>.html` (a readable
-report you can screenshot or open in a browser for your demo).
+Two files per scan: `<prefix>.json` (machine-readable) and `<prefix>.html` (a
+severity-sorted report to open in a browser). All values written into the HTML
+report are HTML-escaped, so a reflected payload captured during the scan is
+displayed as text and never executes when the report is opened. Sample outputs
+are included in this repo (`dvwa_report.html`, `juiceshop_report.html`).
 
 ## Running the tests
 
@@ -57,13 +95,25 @@ pip3 install pytest
 python3 -m pytest -q
 ```
 
-The tests are offline (no network or target needed) and cover the report
-generation, version parsing, header/cookie/JS-library checks, and the SQL
-error signatures.
+The suite is fully offline (no network or live target needed) and covers report
+escaping, version parsing, the header / cookie / JS-library checks, the SQL
+error signatures, the crawler scheme filter, and robots/sitemap seeding.
 
-## Stopping/removing containers when done
+## Limitations and future work
 
-```bash
-docker stop juiceshop dvwa
-docker rm juiceshop dvwa
-```
+This is a learning tool, and it is deliberately honest about what it does not do:
+
+- **It does not execute JavaScript.** Single-page apps (Angular, React) render
+  their navigation client-side, so a plain HTML crawl sees only the shell. The
+  scanner mitigates this by seeding from `robots.txt` and `sitemap.xml`, but full
+  coverage of a SPA would need a headless browser or its REST API map.
+- **Detection is heuristic, not exhaustive.** The XSS and SQLi checks catch
+  reflection and error-based cases; they are not a substitute for a full scanner
+  like OWASP ZAP or Burp Suite. Blind, stored, and time-based cases are out of
+  scope.
+- **Library detection needs a version in the asset path.** Bundlers that emit
+  hash-named files (`main.8f3a.js`) hide the version, so those go undetected.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

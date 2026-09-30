@@ -92,6 +92,29 @@ def test_cookie_flags_detected():
     assert f and "Secure" in f[0]["title"]
 
 
+
+class FakeSession:
+    def __init__(self, pages):
+        self.pages = pages
+        self.headers = {}
+
+    def get(self, url, timeout=8, verify=False):
+        path = url.split(self.base(url), 1)[-1] if False else url
+        key = url.rsplit("/", 1)[-1]
+        text = self.pages.get(key, "")
+        return FakeResp(text=text, status_code=200 if text else 404)
+
+
+def test_seed_urls_reads_robots_and_sitemap():
+    robots = "User-agent: *\nDisallow: /ftp\nDisallow: /admin\n"
+    sitemap = "<urlset><url><loc>http://h/profile</loc></url></urlset>"
+    c = scanner.Crawler("http://h")
+    c.session = FakeSession({"robots.txt": robots, "sitemap.xml": sitemap})
+    seeds = c._seed_urls()
+    assert "http://h/ftp" in seeds
+    assert "http://h/admin" in seeds
+    assert "http://h/profile" in seeds
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     passed = 0
