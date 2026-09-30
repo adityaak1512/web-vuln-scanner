@@ -1,0 +1,29 @@
+{
+  "target": "http://localhost:3000",
+  "scanned_at": "2026-07-24T09:48:24.690056+00:00",
+  "pages_crawled": 1,
+  "forms_discovered": 0,
+  "findings": [
+    {
+      "check": "security_headers",
+      "severity": "medium",
+      "url": "http://localhost:3000",
+      "title": "Missing Content-Security-Policy header",
+      "detail": "Allows a broader range of injected scripts/styles to execute if XSS exists."
+    },
+    {
+      "check": "security_headers",
+      "severity": "medium",
+      "url": "http://localhost:3000",
+      "title": "Missing Strict-Transport-Security (HSTS) header",
+      "detail": "Site can be downgraded to plain HTTP, enabling traffic interception."
+    },
+    {
+      "check": "sensitive_files",
+      "severity": "low",
+      "url": "http://localhost:3000/robots.txt",
+      "title": "robots.txt discloses internal paths",
+      "detail": "Disallow: /ftp"
+    }
+  ]
+}

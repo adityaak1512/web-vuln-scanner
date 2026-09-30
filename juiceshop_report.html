@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vulnerability Scan Report - http://localhost:3000</title>
+<style>
+  body { font-family: -apple-system, Arial, sans-serif; margin: 40px; color:#111; background:#fafafa; }
+  h1 { font-size: 22px; }
+  .meta { color:#555; font-size: 14px; margin-bottom: 20px; }
+  table { border-collapse: collapse; width: 100%; background: white; }
+  th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; }
+  .ethics { background: #eef6ff; border-left: 4px solid #2563eb; padding: 10px 14px; margin: 20px 0; font-size: 14px; }
+</style>
+</head>
+<body>
+  <h1>Vulnerability Scan Report</h1>
+  <div class="meta">
+    Target: <strong>http://localhost:3000</strong><br>
+    Scanned at: 2026-07-24T09:48:24.690056+00:00<br>
+    Pages crawled: 1 &nbsp;|&nbsp; Forms discovered: 0 &nbsp;|&nbsp; Total findings: 3
+  </div>
+  <div><span style="background:#b45309;color:white;padding:4px 12px;border-radius:6px;margin-right:8px;font-size:14px;">medium: 2</span><span style="background:#2563eb;color:white;padding:4px 12px;border-radius:6px;margin-right:8px;font-size:14px;">low: 1</span></div>
+  <div class="ethics">
+    This scan was run against a target explicitly designed/authorized for security testing,
+    as part of a course project. No unauthorized systems were accessed.
+  </div>
+  <table>
+    <tr><th>Severity</th><th>Check</th><th>URL</th><th>Finding</th><th>Detail</th></tr>
+    
+        <tr>
+          <td><span style="background:#b45309;color:white;padding:2px 8px;
+              border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;">
+              medium</span></td>
+          <td>security_headers</td>
+          <td style="word-break:break-all;font-family:monospace;font-size:13px;">http://localhost:3000</td>
+          <td>Missing Content-Security-Policy header</td>
+          <td style="color:#555;font-size:13px;">Allows a broader range of injected scripts/styles to execute if XSS exists.</td>
+        </tr>
+        <tr>
+          <td><span style="background:#b45309;color:white;padding:2px 8px;
+              border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;">
+              medium</span></td>
+          <td>security_headers</td>
+          <td style="word-break:break-all;font-family:monospace;font-size:13px;">http://localhost:3000</td>
+          <td>Missing Strict-Transport-Security (HSTS) header</td>
+          <td style="color:#555;font-size:13px;">Site can be downgraded to plain HTTP, enabling traffic interception.</td>
+        </tr>
+        <tr>
+          <td><span style="background:#2563eb;color:white;padding:2px 8px;
+              border-radius:4px;font-size:12px;font-weight:600;text-transform:uppercase;">
+              low</span></td>
+          <td>sensitive_files</td>
+          <td style="word-break:break-all;font-family:monospace;font-size:13px;">http://localhost:3000/robots.txt</td>
+          <td>robots.txt discloses internal paths</td>
+          <td style="color:#555;font-size:13px;">Disallow: /ftp</td>
+        </tr>
+  </table>
+</body>
+</html>

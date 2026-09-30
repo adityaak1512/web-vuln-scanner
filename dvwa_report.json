@@ -1,0 +1,43 @@
+{
+  "target": "http://localhost:4280",
+  "scanned_at": "2026-07-24T09:48:29.106950+00:00",
+  "pages_crawled": 1,
+  "forms_discovered": 1,
+  "findings": [
+    {
+      "check": "security_headers",
+      "severity": "medium",
+      "url": "http://localhost:4280",
+      "title": "Missing Content-Security-Policy header",
+      "detail": "Allows a broader range of injected scripts/styles to execute if XSS exists."
+    },
+    {
+      "check": "security_headers",
+      "severity": "medium",
+      "url": "http://localhost:4280",
+      "title": "Missing Strict-Transport-Security (HSTS) header",
+      "detail": "Site can be downgraded to plain HTTP, enabling traffic interception."
+    },
+    {
+      "check": "security_headers",
+      "severity": "medium",
+      "url": "http://localhost:4280",
+      "title": "Missing X-Frame-Options header",
+      "detail": "Page can be embedded in an <iframe>, enabling clickjacking attacks."
+    },
+    {
+      "check": "security_headers",
+      "severity": "medium",
+      "url": "http://localhost:4280",
+      "title": "Missing X-Content-Type-Options header",
+      "detail": "Browser may MIME-sniff responses, enabling certain content-spoofing attacks."
+    },
+    {
+      "check": "sensitive_files",
+      "severity": "low",
+      "url": "http://localhost:4280/robots.txt",
+      "title": "robots.txt discloses internal paths",
+      "detail": "Disallow: /"
+    }
+  ]
+}
