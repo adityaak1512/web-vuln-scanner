@@ -6,9 +6,9 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 An educational command-line scanner that crawls a target web application and
-reports common web-security issues. Built as a course project to understand how
-automated scanners work under the hood, using only `requests` and
-`BeautifulSoup`.
+reports common web-security issues. Built from scratch as a UNSW self-study project to understand how
+automated scanners work under the hood (using only `requests` and
+`BeautifulSoup`), then benchmarked against Nikto and OWASP ZAP.
 
 > **Authorized targets only.** Run this against systems you own or have explicit
 > permission to test, such as [OWASP Juice Shop](https://owasp.org/www-project-juice-shop/)
@@ -54,7 +54,8 @@ tooling.
 ## Setup
 
 ```bash
-cd vulnscanner_project
+git clone https://github.com/adityaak1512/web-vuln-scanner.git
+cd web-vuln-scanner
 python3 -m venv venv
 source venv/bin/activate
 pip3 install -r requirements.txt
@@ -87,6 +88,70 @@ severity-sorted report to open in a browser). All values written into the HTML
 report are HTML-escaped, so a reflected payload captured during the scan is
 displayed as text and never executes when the report is opened. Sample outputs
 are included in this repo (`dvwa_report.html`, `juiceshop_report.html`).
+
+## Benchmark: how it compares to Nikto and OWASP ZAP
+
+I ran all three tools against OWASP Juice Shop and DVWA in a local Docker lab,
+then scored them against a **12-issue ground truth** built from each app's
+publicly documented, intentionally planted vulnerabilities (filtered to the
+categories this scanner targets). Sample outputs from those runs are included
+in this repo: `juiceshop_report.*`, `dvwa_report.*`, `nikto_*.txt` and
+`zap_reports/`.
+
+| Target | Known issue | This scanner | Nikto | ZAP |
+|--------|-------------|:---:|:---:|:---:|
+| Juice Shop | Missing Content-Security-Policy | ✅ | ✅ | ✅ |
+| Juice Shop | Missing Referrer / Permissions-Policy | ❌ | ✅ | ✅ |
+| Juice Shop | Outdated client-side library | ❌ | ❌ | ❌ |
+| Juice Shop | Reflected XSS | ❌ | ❌ | ❌ |
+| Juice Shop | Cookie missing HttpOnly / Secure | ❌ | ❌ | ❌ |
+| Juice Shop | Exposed sensitive file | ❌ | ❌ | ❌ |
+| DVWA | Missing X-Frame-Options | ✅ | ❌ | ✅ |
+| DVWA | Missing Content-Security-Policy | ✅ | ✅ | ✅ |
+| DVWA | Cookie missing HttpOnly / Secure | ❌ | ✅ | ✅ |
+| DVWA | Outdated server (Apache 2.4.25) | ❌ | ✅ | ❌ |
+| DVWA | Reflected XSS (low) | ❌ | ❌ | ❌ |
+| DVWA | SQL injection (low) | ❌ | ❌ | ❌ |
+| | **True positives / false positives** | **3 / 0** | **5 / 0** | **5 / 0** |
+
+**What the numbers say.** The mature tools found more, and the scanner's misses
+have clear causes. In that benchmark run none of the three crawlers got past
+Juice Shop's Angular shell or DVWA's login page, so the XSS and SQLi checks
+never had a real injection point to test. DVWA's session cookie is only set on
+the post-login redirect, which the shallow crawl never reached. Server-version
+and Referrer/Permissions-Policy checks are out of scope by design. Since the
+benchmark, I added `--dvwa-login` and robots.txt/sitemap seeding to address the
+crawl-depth problem directly.
+
+## Case study: killing a false-positive pattern
+
+The first Juice Shop scan reported **14 findings**, including twelve "exposed"
+sensitive files (`/.env`, `/.git/config`, `/backup.sql`, …), all because each
+path returned `200 OK`. Checking them by hand with curl showed they weren't real:
+
+```text
+$ curl -s -o /dev/null -w "%{http_code} %{size_download} bytes\n" http://localhost:3000/this-definitely-does-not-exist-xyz
+200 9903 bytes
+$ curl -s -o /dev/null -w "%{http_code} %{size_download} bytes\n" http://localhost:3000/.env
+200 9903 bytes
+$ curl -s -o /dev/null -w "%{http_code} %{size_download} bytes\n" http://localhost:3000/backup.sql
+200 9903 bytes
+```
+
+Every path, including one that cannot exist, returned the same 9,903-byte
+Angular `index.html`. Single-page apps serve their shell for any unknown route,
+so "200 means the file exists" is wrong.
+
+**Fix:** before probing, the scanner requests a random non-existent path and
+records its **status code, byte length and SHA-256 content hash**
+(`_get_baseline_404` in `scanner.py`). Any probe matching that fingerprint is
+treated as the app's generic fallback page, not a file. A second guard rejects
+files like `.env` or `.sql` that come back as `text/html`.
+
+**Result:** Juice Shop findings went from **14 to 3** (missing CSP, missing
+HSTS, robots.txt disclosure), matching Nikto and ZAP, with no real issues lost.
+DVWA produced the same 5 findings before and after, confirming nothing broke
+on a target that never had the problem.
 
 ## Running the tests
 
